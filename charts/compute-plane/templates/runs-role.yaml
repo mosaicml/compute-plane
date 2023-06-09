@@ -1,0 +1,26 @@
+{{- if and .Values.worker.enabled .Values.runs.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "runs.name" . }}
+  namespace: {{ include "runs-namespace" . }}
+  labels:
+    {{- include "runs.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+  {{- if or .Values.worker.enableRunLogging .Values.worker.enableRunInteractivity }}
+  - apiGroups: [ "" ]
+    resources: [ "pods" ]
+    verbs: [ "get" ]
+  {{- else }}
+  []
+  {{- end }}
+  {{- if .Values.worker.enableRunInteractivity }}
+  - apiGroups: [ "" ]
+    resources: [ "pods/exec" ]
+    verbs: [ "create" ]
+  {{- end }}
+{{- end }}

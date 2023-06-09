@@ -1,0 +1,310 @@
+# The service API key for the cluster. This is distinct from your personal
+# API key used to submit workloads to the MosaicML platform.
+apiKey: <YOUR MOSAICML PLATFORM SERVICE API KEY>
+
+# A name to be used for naming resources. Defaults to the release name.
+name: compute-plane
+
+# The name of the Kubernetes namespace in which the compute plane will be
+# deployed. Defaults to the release namespace. This can be overridden for
+# some components.
+namespace: ""
+
+# Domain names for services in the MosaicML Control Plane. These should
+# generally not need to be modified.
+controlPlane:
+  # TODO: standardize these as `api.mosaicml.com`, `morc.mosaicml.com`, etc.
+  mapiAddress: https://api.mosaicml.com/graphql
+  morcAddress: morc.mosaicml.com:443
+  mlogAddress: mlog.mosaicml.com:443
+  mintAddress: mint.mosaicml.com
+
+# The environment in which the compute plane is being deployed. This should
+# generally be left as `prod` to ensure use of the latest stable versions of
+# all components, even when the compute plane is being used for non-production
+# workloads.
+env: prod
+
+# The names of any existing Kubernetes secrets that should be used to
+# authenticate image pulls.
+imagePullSecrets: []
+
+# Annotations to apply to all created resources.
+annotations: {}
+
+# Labels to apply to all created resources.
+lables: {}
+
+# The MosaicML Worker is a Kubernetes deployment which communicates with the
+# MosaicML Control Plane to launch and monitor new training runs. The Worker
+# communicates with the control plane via regular heartbeats to send status
+# updates to the control plane and receive orchestration instructions.
+worker:
+  # Set to false to disable the Worker. This will prevent training runs from
+  # being launched on the cluster.
+  enabled: true
+
+  # The name of the Kubernetes namespace in which users' training runs will be
+  # launched. Defaults to `worker.namespace`.
+  runsNamespace: ""
+
+  # Enables run logs to be sent to and persisted in the Control Plane, enabling
+  # users to request and stream logs from their runs.
+  enableRunLogging: true
+
+  # Enables users to connect to and interactively run commands within containers
+  # spawned for training runs. Note that this creates a tunnel from the Compute
+  # Plane to the Control Plane, enabling the Control Plane to establish a TCP
+  # connection with the Compute Plane.
+  enableRunInteractivity: true
+
+  image:
+    repository: mosaicml/morc-worker # TODO: change to mosaicml/worker
+
+    # While in beta, we recommend using tag=latest with pullPolicy=Always to
+    # ensure that the compute plane is always up to date with the latest
+    # features and bug fixes.
+    tag: latest
+    pullPolicy: Always
+
+  # Configuration for the ServiceAccount and attached RBAC roles used by the
+  # Worker.
+  rbac:
+    # Create the needed RBAC roles and ServiceAccount.
+    create: true
+
+    # The name of an existing ServiceAccount to use. Mutually exclusive with
+    # `rbac.create: true`.
+    serviceAccountName: ""
+
+    # Annotations to attach to the created ServiceAccount. Ignored if
+    # `rbac.create: false`.
+    serviceAccountAnnotations: {}
+
+    # Allow the Worker to use the Kubernetes API to query cluster Nodes. If
+    # false, the Worker will be unable to monitor Node status. Ignored if
+    # `rbac.create: false`.
+    allowNodeReads: true
+
+    # Allow the Worker to use the Kubernetes API to update cluster Nodes. If
+    # false, the Worker will be unable to cordon faulty Nodes. Ignored if
+    # `rbac.create: false`.
+    allowNodeWrites: true
+
+  # / Even though this pod only has one container (well, once JWT refresh is
+  # abstracted to its own deployment anyways), specifying container-specific
+  # configuration in a dedicated section is ideal for future-proofing, in case
+  # we ever add another container to this deployment in the future.
+  containers:
+    worker:
+      # Resource requests and limits for the Worker main container.
+      # See: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+      resources: {} # TODO: figure out some defaults for the worker, it's kinda crazy we don't put anything here
+
+      # Security context for the Worker main container.
+      # See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+      securityContext: {}
+
+  # Security context for the Worker Pod.
+  # See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  securityContext: {}
+
+  # Node selector for scheduling the Worker Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+  #
+  # NOTE: it is highly recommended to use this field to ensure that the Worker
+  # schedules onto a low-cost controller node, especially if the cluster is
+  # configured to autoscale unused GPU nodes down to zero.
+  nodeSelector: {}
+
+  # Tolerations for scheduling the Worker Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
+
+  # Affinity configuration for scheduling the Worker Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+
+  # Priority class for the Worker Pod.
+  # See: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
+  priorityClassName: ""
+
+
+# Runs are launched by the Worker. The manifests are mostly configured by
+# the MosaicML platform, but all runs share some common RBAC configuration
+# which can be adjusted here.
+#
+# All configuration here is ignored if `worker.enabled: false`.
+runs:
+  # The name of the Kubernetes namespace in which runs will be launched.
+  # Defaults to the global `.namespace` value.
+  namespace: ""
+
+  # Configuration for the service account and attached RBAC roles used by runs
+  # launched by the Worker.
+  rbac:
+    # Create the needed RBAC roles and ServiceAccount.
+    create: true
+
+    # The name of an existing ServiceAccount to use. Mutually exclusive with
+    # `rbac.create: true`.
+    serviceAccountName: ""
+
+    # Annotations to attach to the created ServiceAccount. Ignored if
+    # `rbac.create: false`.
+    serviceAccountAnnotations: {}
+
+
+# NodeDoctor is a Kubernetes daemonset which contributes to monitoring the
+# health of individual nodes. It is responsible for detecting and reporting
+# GPU and accelerator-related issues. Note that some node health issues, such
+# as total node failures, are detected and reported by the Worker.
+nodeDoctor:
+  # Set to false to disable NodeDoctor. This will prevent the control plane
+  # from being able to detect and respond to GPU issues and failures.
+  enabled: true
+
+  # The frequency with which to refresh GPU health information. It is
+  # recommended to leave this as-is.
+  refreshRateMs: "300000" # 5 minutes
+
+  image:
+    repository: mosaicml/node-doctor
+
+    # While in beta, we recommend using tag=latest with pullPolicy=Always to
+    # ensure that the compute plane is always up to date with the latest
+    # features and bug fixes.
+    tag: latest
+    pullPolicy: Always
+
+  # Configuration for the ServiceAccount and attached RBAC roles used by
+  # NodeDoctor.
+  rbac:
+    # Create the needed RBAC roles and ServiceAccount.
+    create: true
+
+    # The name of an existing ServiceAccount to use. Ignored if
+    # `rbac.create: true`, otherwise required.
+    serviceAccountName: ""
+
+    # Annotations to attach to the created ServiceAccount. Ignored if
+    # `rbac.create: false`.
+    serviceAccountAnnotations: {}
+
+  containers:
+    nodeDoctor:
+      # Resource requests and limits for the NodeDoctor main containers.
+      # See: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+      resources:
+        limits:
+          cpu: 10m
+          memory: 80Mi
+        requests:
+          cpu: 10m
+          memory: 80Mi
+
+      # Security context for the NodeDoctor main containers.
+      # See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+      securityContext: {}
+
+  # Security context for the NodeDoctor Pods.
+  # See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  securityContext: {}
+
+  # Node selector for scheduling the NodeDoctor Pods.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+  #
+  # The default node selector ensures that NodeDoctor is only scheduled onto
+  # nodes with NVIDIA GPUs installed.
+  nodeSelector:
+    feature.node.kubernetes.io/pci-10de.present: "true"
+
+  # Tolerations for scheduling the jwtRefresh Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  #
+  # The default tolerations ensure that NodeDoctor can still be scheduled onto
+  # cordoned nodes.
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+
+  # Affinity configuration for scheduling the jwtRefresh Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+
+  # Priority class for the NodeDoctor Pods.
+  # See: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
+  #
+  # The default priority class gives NodeDoctor the highest possible priority.
+  priorityClassName: system-node-critical
+
+
+# The jwtRefresh deployment is responsible for cycling JWT tokens for both
+# other compute plane services as well as user workloads. Delegating this task
+# to a designated workload enables user-scoped credentials to be safely
+# provisioned for unprivileged user workloads without leaking cluster-scoped
+# credentials such as the API key.
+#
+# The jwtRefresh deployment is necessary for the operation of the cluster,
+# and cannot be disabled.
+jwtRefresh:
+  # The frequency with which to refresh JWT tokens. It is recommended to leave
+  # this as-is.
+  refreshRateMs: "7200000" # 2 hours
+
+  image:
+    repository: mosaicml/jwt-refresh
+
+    # While in beta, we recommend using tag=latest with pullPolicy=Always to
+    # ensure that the compute plane is always up to date with the latest
+    # features and bug fixes.
+    tag: latest
+    pullPolicy: Always
+
+  # Configuration for the ServiceAccount and attached RBAC roles used by the
+  # jwtRefresh deployment.
+  rbac:
+    # Create the needed RBAC roles and ServiceAccount.
+    create: true
+
+    # The name of an existing ServiceAccount to use. Mutually exclusive with
+    # `rbac.create: true`.
+    serviceAccountName: ""
+
+    # Annotations to attach to the created ServiceAccount. Ignored if
+    # `rbac.create: false`.
+    serviceAccountAnnotations: {}
+
+  containers:
+    jwtRefresh:
+      # Resource requests and limits for the jwtRefresh main container.
+      # See: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+      resources: {} # TODO: figure out some defaults for the jwtRefresh
+
+      # Security context for the jwtRefresh main container.
+      # See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+      securityContext: {}
+
+  # Security context for the jwtRefresh Pod.
+  # See: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  securityContext: {}
+
+  # Node selector for scheduling the jwtRefresh Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+  #
+  # NOTE: it is highly recommended to use this field to ensure that the
+  # jwtRefresh deployment schedules onto a low-cost controller node, especially
+  # if the cluster is configured to autoscale unused GPU nodes down to zero.
+  nodeSelector: {}
+
+  # Tolerations for scheduling the jwtRefresh Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
+
+  # Affinity configuration for scheduling the jwtRefresh Pod.
+  # See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+
+  # Priority class for the jwtRefresh Pod.
+  # See: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
+  priorityClassName: ""

@@ -1,0 +1,20 @@
+{{- if and .Values.worker.enabled .Values.worker.rbac.create .Values.worker.rbac.allowNodeReads }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "worker.name" . }}
+  labels:
+    {{- include "worker.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "worker.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "worker.name" . }}
+    namespace: {{ include "main-namespace" . }}
+{{- end }}

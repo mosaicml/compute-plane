@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jwt-refresh.name" . }}
+  namespace: {{ include "main-namespace" . }}
+  labels:
+    {{- include "jwt-refresh.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "jwt-refresh.selector-labels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "jwt-refresh.selector-labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "jwt-refresh.service-account-name" . }}
+      securityContext:
+        {{- toYaml .Values.jwtRefresh.securityContext | nindent 8 }}
+      {{- with .Values.jwtRefresh.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      containers:
+        - name: {{ include "jwt-refresh.name" . }}
+          securityContext:
+            {{- toYaml .Values.jwtRefresh.containers.jwtRefresh.securityContext | nindent 12 }}
+          image: "{{ .Values.jwtRefresh.image.repository }}:{{ .Values.jwtRefresh.image.tag }}"
+          imagePullPolicy: {{ .Values.jwtRefresh.image.pullPolicy }}
+          env:
+            - name: HELM_VERSION
+              value: {{ include "compute-plane.chart" . }}
+            - name: RUNS_NAMESPACE
+              value: {{ include "runs-namespace" . }}
+            - name: MORC_ADDR
+              value: {{ .Values.controlPlane.morcAddress }}
+            - name: MAPI_ADDR
+              value: {{ .Values.controlPlane.mapiAddress }}
+            - name: SECRETS_POLL_INTERVAL
+              value: "10000"
+            - name: DEPLOYMENT_ENV
+              value: {{ .Values.env }}
+            - name: REFRESH_RATE_MS
+              value: {{ .Values.jwtRefresh.refreshRateMs | quote }}
+            - name: SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "compute-plane.service-api-key.name" . }}
+                  key: serviceApiKey
+          resources:
+            {{- toYaml .Values.jwtRefresh.containers.jwtRefresh.resources | nindent 12 }}
+      {{- with .Values.jwtRefresh.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jwtRefresh.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jwtRefresh.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

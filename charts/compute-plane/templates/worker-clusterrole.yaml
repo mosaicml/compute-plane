@@ -1,0 +1,23 @@
+{{- if and .Values.worker.enabled .Values.worker.rbac.create .Values.worker.rbac.allowNodeReads }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "worker.name" . }}
+  labels:
+    {{- include "worker.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "nodes" ]
+    {{- if .Values.worker.rbac.allowNodeWrites }}
+    verbs: [ "get", "list", "watch", "update", "patch" ]
+    {{- else }}
+    verbs: [ "get", "list", "watch" ]
+    {{- end }}
+  - apiGroups: [ "apiextensions.k8s.io" ]
+    resources: [ "customresourcedefinitions" ]
+    verbs: [ "get", "list", "watch" ]
+{{- end }}

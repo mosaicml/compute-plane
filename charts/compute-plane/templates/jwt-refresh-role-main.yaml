@@ -1,0 +1,17 @@
+{{- if .Values.jwtRefresh.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "jwt-refresh.name" . }}
+  namespace: {{ include "main-namespace" . }}
+  labels:
+    {{- include "jwt-refresh.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "secrets" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+{{- end }}

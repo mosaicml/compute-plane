@@ -1,0 +1,7 @@
+apiVersion: v2
+name: mosaicml-compute-plane
+description: MosaicML Compute Plane
+type: application
+version: 0.1.11
+maintainers:
+  - name: MosaicML

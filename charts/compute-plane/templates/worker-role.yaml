@@ -1,0 +1,35 @@
+{{- if and .Values.worker.enabled .Values.worker.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "worker.name" . }}
+  namespace: {{ include "runs-namespace" . }}
+  labels:
+    {{- include "worker.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "configmaps" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+  - apiGroups: [ "scheduling.sigs.k8s.io" ]
+    resources: [ "podgroups" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+  - apiGroups: [ "scheduling.x-k8s.io" ]
+    resources: [ "podgroups" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+  - apiGroups: [ "" ]
+    resources: [ "services" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+  - apiGroups: [ "" ]
+    resources: [ "pods" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+  - apiGroups: [ "" ]
+    resources: [ "secrets" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+  - apiGroups: [ "" ]
+    resources: [ "events" ]
+    verbs: [ "get", "list", "watch" ]
+{{- end }}

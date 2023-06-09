@@ -1,0 +1,21 @@
+{{- if and .Values.jwtRefresh.rbac.create (ne (include "main-namespace" .) (include "runs-namespace" .)) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "jwt-refresh.name" . }}
+  namespace: {{ include "runs-namespace" . }}
+  labels:
+    {{- include "jwt-refresh.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "jwt-refresh.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "jwt-refresh.name" . }}
+    namespace: {{ include "main-namespace" . }}
+{{- end }}
