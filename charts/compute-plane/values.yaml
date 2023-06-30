@@ -33,7 +33,7 @@ imagePullSecrets: []
 annotations: {}
 
 # Labels to apply to all created resources.
-lables: {}
+labels: {}
 
 # The MosaicML Worker is a Kubernetes deployment which communicates with the
 # MosaicML Control Plane to launch and monitor new training runs. The Worker
